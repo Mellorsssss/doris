@@ -478,6 +478,7 @@ add_compile_options(-Wno-unused-parameter
                     -Wno-array-bounds)
 
 if (COMPILER_GCC)
+    MESSAGE( STATUS "this var key = ${CMAKE_CXX_COMPILER_VERSION}.")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "11.1")
         message(FATAL_ERROR "Need GCC version at least 11.1")
     endif()

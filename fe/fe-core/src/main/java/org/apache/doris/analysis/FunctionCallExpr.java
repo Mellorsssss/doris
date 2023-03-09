@@ -30,6 +30,8 @@ import org.apache.doris.catalog.Function;
 import org.apache.doris.catalog.FunctionSet;
 import org.apache.doris.catalog.ScalarFunction;
 import org.apache.doris.catalog.ScalarType;
+import org.apache.doris.catalog.StructField;
+import org.apache.doris.catalog.StructType;
 import org.apache.doris.catalog.Type;
 import org.apache.doris.common.AnalysisException;
 import org.apache.doris.common.ErrorCode;
@@ -1112,6 +1114,7 @@ public class FunctionCallExpr extends Expr {
         for (int i = 0; i < this.children.size(); ++i) {
             this.children.get(i).analyze(analyzer);
             argTypes[i] = this.children.get(i).getType();
+            LOG.warn("the child type is {}", argTypes[i].toString());
         }
 
         analyzeBuiltinAggFunction(analyzer);
@@ -1256,6 +1259,7 @@ public class FunctionCallExpr extends Expr {
             fn = getBuiltinFunction(fnName.getFunction(), new Type[] { Type.DOUBLE },
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
         } else {
+            LOG.warn("try to find the function in last branch");
             // now first find table function in table function sets
             if (isTableFnCall) {
                 Type[] childTypes = collectChildReturnTypes();
@@ -1272,12 +1276,20 @@ public class FunctionCallExpr extends Expr {
                 // now first find function in built-in functions
                 if (Strings.isNullOrEmpty(fnName.getDb())) {
                     Type[] childTypes = collectChildReturnTypes();
+                    for (int i = 0; i < childTypes.length; ++i) {
+                        LOG.warn("the child type is {}", childTypes[i].toString());
+                    }
                     fn = getBuiltinFunction(fnName.getFunction(), childTypes,
                             Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+                    LOG.warn("try to find the function in builtin functions");
+                    if (fn == null) {
+                        LOG.warn("fail to find the function in builtin functions");
+                    }
                 }
 
                 // find user defined functions
                 if (fn == null) {
+                    LOG.warn("try to find the function in UDF functions");
                     if (!analyzer.isUDFAllowed()) {
                         throw new AnalysisException(
                                 "Does not support non-builtin functions, or function does not exist: "
@@ -1465,6 +1477,7 @@ public class FunctionCallExpr extends Expr {
             this.type = PRECISION_INFER_RULE.getOrDefault(fnName.getFunction(), DEFAULT_PRECISION_INFER_RULE)
                     .apply(children, this.type);
         }
+        LOG.warn("fn's return type is {}", this.type.toString());
         // rewrite return type if is nested type function
         analyzeNestedFunction();
     }
@@ -1498,6 +1511,18 @@ public class FunctionCallExpr extends Expr {
             if (children.size() > 0) {
                 this.type = children.get(0).getType();
             }
+        } else if (fnName.getFunction().equalsIgnoreCase("array_zip")) {
+            LOG.warn("entering the array_zip handling");
+
+            // use the child type to make a STRUCT type
+            Type[] childTypes = collectChildReturnTypes();
+            ArrayList<StructField> fields = new ArrayList<>();
+            for (int i = 0; i < childTypes.length; i++) {
+                fields.add(new StructField(((ArrayType) childTypes[i]).getItemType()));
+            }
+
+            this.type = new ArrayType(new StructType(fields));
+            LOG.warn("the type is {}", this.type.toString());
         }
 
         if (this.type instanceof ArrayType) {
@@ -1512,6 +1537,7 @@ public class FunctionCallExpr extends Expr {
             }
             arrayType.setContainsNull(containsNull);
         }
+        LOG.warn("the type is {} after nullable setting", this.type.toString());
     }
 
     private static boolean match(String pattern, int pos, String value) {

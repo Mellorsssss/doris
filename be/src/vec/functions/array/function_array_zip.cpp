@@ -50,19 +50,18 @@ public:
         DataTypes res_data_types;
         size_t num_elements = arguments.size();
         for (size_t i = 0; i < num_elements; ++i) {
-            LOG(INFO) << "handle the " << i << "-th element" << arguments[i]->get_name();
-
             DCHECK(is_array(arguments[i])) << i << "-th element is not array type";
+
             const auto* array_type = check_and_get_data_type<DataTypeArray>(arguments[i].get());
             DCHECK(array_type) << "function: " << get_name() << " " << i + 1
                                << "-th argument is not array";
-            res_data_types.emplace_back(remove_nullable((array_type->get_nested_type())));
 
-            LOG(INFO) << "handle the " << i << "-th unnested element" << remove_nullable(array_type->get_nested_type())->get_name();
+            res_data_types.emplace_back(
+                    make_nullable(remove_nullable((array_type->get_nested_type()))));
         }
 
-        auto res = std::make_shared<DataTypeArray>(std::make_shared<DataTypeStruct>(res_data_types));
-        LOG(INFO) << "try to return the right type " << res->get_name();
+        auto res = std::make_shared<DataTypeArray>(
+                make_nullable(std::make_shared<DataTypeStruct>(res_data_types)));
         return res;
     }
 
@@ -70,11 +69,10 @@ public:
                         size_t result, size_t input_rows_count) override {
         size_t num_element = arguments.size();
 
-        // all the columns must has the same size as the first column
+        // all the columns must have the same size as the first column
         ColumnPtr first_array_column;
         Columns tuple_columns(num_element);
 
-        LOG(INFO) << "expected type " << block.get_by_position(result).type->get_name();
         for (size_t i = 0; i < num_element; ++i) {
             auto col = block.get_by_position(arguments[i]).column;
             col = col->convert_to_full_column_if_const();
@@ -90,24 +88,22 @@ public:
                 first_array_column = col;
             } else if (!column_array->has_equal_offsets(
                                static_cast<const ColumnArray&>(*first_array_column))) {
-                return Status::RuntimeError(fmt::format(
-                        "execute failed, function {}'s {}-th argument should have same offsets with first argument",
-                        get_name(), i + 1));
+                return Status::RuntimeError(
+                        fmt::format("execute failed, function {}'s {}-th argument should have same "
+                                    "offsets with first argument",
+                                    get_name(), i + 1));
             }
-            
+
             tuple_columns[i] = column_array->get_data_ptr();
-            LOG(INFO) << "handle " << i << "-th element" << "at " << arguments[i];
-        }
-        
-        auto& offset = static_cast<const ColumnArray&>(*first_array_column).get_offsets();
-        for (size_t i = 0; i < static_cast<const ColumnArray&>(*first_array_column).size(); ++i){
-            LOG(INFO) << i << "-th offset is " << offset[i];
         }
 
-        LOG(INFO) << "try to return the value";
-        auto res_column = ColumnArray::create(ColumnStruct::create(tuple_columns), static_cast<const ColumnArray&>(*first_array_column).get_offsets_ptr());
+        auto tuples = ColumnStruct::create(tuple_columns);
+        auto nullable_tuples =
+                ColumnNullable::create(tuples, ColumnUInt8::create(tuples->size(), 0));
+        auto res_column = ColumnArray::create(
+                nullable_tuples,
+                static_cast<const ColumnArray&>(*first_array_column).get_offsets_ptr());
         block.replace_by_position(result, std::move(res_column));
-        LOG(INFO) << "successfully return the value";
         return Status::OK();
     }
 };

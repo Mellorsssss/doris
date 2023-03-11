@@ -223,6 +223,17 @@ suite("test_array_functions_by_literal") {
     qt_sql """select array_apply(array(cast (24.99 as decimal(10,3)),cast (25.99 as decimal(10,3))), ">", '25')"""
     qt_sql """select array_apply(array(cast (24.99 as decimal(10,3)),cast (25.99 as decimal(10,3))), "!=", '25.99')"""
 
+    // array_zip
+    qt_sql "select array_zip(['a', 'b', 'c'], ['d', 'e', 'f'])"
+    qt_sql "select array_zip(['a', 'b', 'c'], ['d', 'e', 'f'], ['g', 'h', 'i'])"
+    qt_sql "select array_zip([1, 2, 3, 4, 5], ['d', 'o', 'r', 'i', 's'])"
+    qt_sql "select array_zip([1.1, 2.2, 3.3], [1, 2, 3])"
+    qt_sql "select array_zip([1, null, 3], [null, 'b', null])"
+    qt_sql "select array_zip(array(cast (3.05 as decimal(10,3)), cast (2.22 as decimal(10,3))), array(cast (3.14 as decimal(10,3)), cast (6.66 as decimal(10,3))))" 
+    qt_sql "select array_zip(array(cast ('2000-03-05' as datev2), cast ('2023-03-10' as datev2)), array(cast ('2000-02-02' as datev2), cast ('2023-03-10' as datev2)))"
+    qt_sql "select array_zip(array(cast ('2023-03-05 12:23:24.999' as datetimev2(3)),cast ('2023-03-05 15:23:23.997' as datetimev2(3))))"
+    qt_sql "select array_zip([1, 2, 3], null, ['foo', 'bar', 'test'])"
+
     qt_sql "select array(8, null)"
     qt_sql "select array('a', 1, 2)"
     qt_sql "select array(null, null, null)"

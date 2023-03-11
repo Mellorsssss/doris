@@ -329,7 +329,6 @@ ColumnPtr ColumnArray::convert_to_full_column_if_const() const {
 }
 
 bool ColumnArray::has_equal_offsets(const ColumnArray& other) const {
-    // if (offsets == other.offsets) return true;
     const Offsets64& offsets1 = get_offsets();
     const Offsets64& offsets2 = other.get_offsets();
     return offsets1.size() == offsets2.size() &&
